@@ -1,0 +1,32 @@
+name: ERICA Contest Crawler
+
+on:
+  schedule:
+    # 매일 한국 시간(KST) 오전 9시 자동 실행 = UTC 00:00
+    - cron: '0 0 * * *'
+  workflow_dispatch: # GitHub 웹사이트에서 수동으로 '실행' 버튼을 누를 수 있게 허용
+
+jobs:
+  run-crawler:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 저장소 코드 가져오기
+        uses: actions/checkout@v3
+
+      - name: 🐍 Python 3.10 설정
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip' # 패키지 설치 속도 최적화
+
+      - name: 📦 필요 패키지 설치
+        run: |
+          pip install -r requirements.txt
+
+      - name: 🚀 크롤러 실행 및 DB 저장
+        env:
+          SUPABASE_URL: https://louahzivlvommoatsgrm.supabase.co
+          SUPABASE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvdWFoeml2bHZvbW1vYXRzZ3JtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5MTU5NzcsImV4cCI6MjA4NTQ5MTk3N30._LAoDLd5yjt3klD8zyZik1m5-1_l-jpXghGpZUTKy5o
+        run: |
+          python run_all.py
