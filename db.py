@@ -4,6 +4,21 @@ db.py — Supabase 연결 및 공모전 데이터 저장 공통 모듈
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import re
+
+def extract_end_date(text: str) -> str | None:
+    if not text:
+        return None
+    # 2024.05.20, 24-05-20, 2024년 5월 20일 등의 패턴 추출
+    pattern = r'(202\d|\d{2})[-./년]\s*(1[0-2]|0?[1-9])[-./월]\s*(3[01]|[12][0-9]|0?[1-9])'
+    matches = re.findall(pattern, text)
+    if matches:
+        # 보통 본문 맨 마지막에 나오는 날짜가 마감일일 확률이 높음
+        y, m, d = matches[-1]
+        if len(y) == 2:
+            y = "20" + y
+        return f"{y}-{int(m):02d}-{int(d):02d}"
+    return None
 from datetime import datetime, timezone
 
 load_dotenv()
@@ -46,16 +61,28 @@ def upsert_contest(item: dict) -> bool:
 
         # 필수 기본값 보정
         now = datetime.now(timezone.utc).isoformat()
+        description = (item.get("description") or "").strip()[:2000]
+        end_date = item.get("end_date")
+        
+        # 날짜 추출기 사용 (명시적 날짜가 없을 경우 본문에서 탐색)
+        if not end_date:
+            end_date = extract_end_date(description)
+            
+        # 그래도 못 찾았다면, DB 제약조건(not-null) 위반을 막기 위해 기본값(오늘부터 7일 뒤) 부여
+        if not end_date:
+            from datetime import timedelta
+            end_date = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%d")
+            
         row = {
             "title":       item.get("title", "").strip()[:200],
-            "description": (item.get("description") or "").strip()[:2000],
+            "description": description,
             "source_url":  source_url,
             "apply_url":   (item.get("apply_url") or source_url).strip(),
             "poster_url":  item.get("poster_url"),
             "category":    item.get("category", "교내 공모전"),
             "targets":     item.get("targets", ["재학생"]),
             "start_date":  item.get("start_date"),
-            "end_date":    item.get("end_date"),
+            "end_date":    end_date,
             "status":      "draft",
             "created_at":  now,
             "updated_at":  now,
